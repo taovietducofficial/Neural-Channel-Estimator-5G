@@ -335,7 +335,12 @@ someone else could operate":
 
 ---
 
+<details>
+<summary>
+
 ## Honest limitations
+
+</summary>
 
 Stated directly rather than buried - what this project does *not* claim:
 
@@ -373,6 +378,8 @@ Stated directly rather than buried - what this project does *not* claim:
   is built and runnable (`oran-stub/`), but it is not a spec-compliant
   E2AP/RIC integration; the reasoning is documented, not glossed over, in
   [`docs/oran-integration.md`](docs/oran-integration.md).
+
+</details>
 
 ## Further reading
 
