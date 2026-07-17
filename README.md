@@ -6,6 +6,8 @@ deployable service - built on NVIDIA Sionna.**
 
 **Author:** [Tào Việt Đức](https://github.com/taovietducofficial)
 
+**Language:** English | [Tiếng Việt](README.vi.md)
+
 ---
 
 ## At a glance
