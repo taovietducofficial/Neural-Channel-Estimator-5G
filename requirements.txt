@@ -1,5 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.13.0
 sionna==2.0.1
-numpy==2.4.6
+numpy==2.5.1
 matplotlib==3.11.0
