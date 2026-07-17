@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: neural-channel-estimator-5g
+    runtime: docker
+    dockerfilePath: ./service/Dockerfile
+    dockerContext: ./service
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
