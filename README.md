@@ -181,7 +181,7 @@ docs/oran-integration.md        honest mapping to O-RAN xApp/rApp/E2/A1 concepts
 docs/business-impact.md          KPI/business framing built strictly from measured numbers
 
 pyproject.toml                    ruff + mypy config
-LICENSE                            MIT
+LICENSE                            All rights reserved (public for portfolio/evaluation viewing only)
 Makefile                          research-test / export / fixtures / test / lint / typecheck / docker-build / docker-run
 .github/workflows/ci.yml            lint+typecheck and service tests + docker build on every push; research tests on demand
 ```
