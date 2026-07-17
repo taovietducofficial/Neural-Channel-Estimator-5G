@@ -4,6 +4,8 @@
 in the 5G radio receiver — trained, benchmarked, and packaged as a real,
 deployable service — built on NVIDIA Sionna.**
 
+**Author:** [Tào Việt Đức](https://github.com/taovietducofficial)
+
 ---
 
 ## At a glance
