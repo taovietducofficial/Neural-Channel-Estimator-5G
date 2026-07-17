@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r service/requirements-dev.txt
-      - run: python -m ruff check service/
+      - run: python -m ruff check service/ src/ oran-stub/
       - run: python -m mypy service/
 
   service-tests:

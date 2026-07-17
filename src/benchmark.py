@@ -5,9 +5,9 @@ import time
 
 import torch
 import torch.nn as nn
+from sionna.phy.nr import PUSCHConfig, PUSCHTransmitter
 
 from src.models import CNNChannelEstimator, TransformerChannelEstimator
-from sionna.phy.nr import PUSCHConfig, PUSCHTransmitter
 
 GRID_SHAPE = (8, 2, 14, 48)
 
@@ -92,7 +92,9 @@ def main(checkpoints_dir="checkpoints", batch_size=8):
 
         rows.append((name, technique, fp32_ms, opt_ms, fp32_kb, opt_kb))
 
-    print(f"{'model':<12}{'technique':<30}{'fp32 ms':>10}{'opt ms':>10}{'speedup':>10}{'fp32 KB':>10}{'opt KB':>10}")
+    cols = ["model", "technique", "fp32 ms", "opt ms", "speedup", "fp32 KB", "opt KB"]
+    widths = [12, 30, 10, 10, 10, 10, 10]
+    print("".join(c.ljust(w) if i < 2 else c.rjust(w) for i, (c, w) in enumerate(zip(cols, widths))))
     for name, technique, fp32_ms, opt_ms, fp32_kb, opt_kb in rows:
         speedup = fp32_ms / opt_ms if opt_ms > 0 else float("nan")
         print(f"{name:<12}{technique:<30}{fp32_ms:>10.4f}{opt_ms:>10.4f}{speedup:>9.2f}x{fp32_kb:>10.1f}{opt_kb:>10.1f}")

@@ -1,24 +1,27 @@
 import numpy as np
 import torch
-
 from sionna.phy.channel import OFDMChannel
-from sionna.phy.channel.tr38901 import CDL, Antenna, AntennaArray
-from sionna.phy.nr import PUSCHConfig, PUSCHTransmitter, PUSCHReceiver
+from sionna.phy.channel.tr38901 import CDL, AntennaArray
+from sionna.phy.nr import PUSCHConfig, PUSCHReceiver, PUSCHTransmitter
 
 CARRIER_FREQUENCY = 3.5e9
 
 
-def build_link(cdl_model="C", delay_spread=100e-9, device="cpu"):
+def build_link(cdl_model="C", delay_spread=100e-9, device="cpu", num_layers=1):
     pusch_config = PUSCHConfig()
+    if num_layers > 1:
+        pusch_config.num_layers = num_layers
+        pusch_config.num_antenna_ports = num_layers
+        pusch_config.tpmi = 0
     transmitter = PUSCHTransmitter(pusch_config, device=device)
 
     ut_array = AntennaArray(
-        num_rows=1, num_cols=1, polarization="single",
+        num_rows=1, num_cols=num_layers, polarization="single",
         polarization_type="V", antenna_pattern="omni",
         carrier_frequency=CARRIER_FREQUENCY, device=device,
     )
     bs_array = AntennaArray(
-        num_rows=1, num_cols=1, polarization="single",
+        num_rows=1, num_cols=num_layers, polarization="single",
         polarization_type="V", antenna_pattern="omni",
         carrier_frequency=CARRIER_FREQUENCY, device=device,
     )
@@ -42,9 +45,9 @@ def ebno_to_no(ebno_db, num_bits_per_symbol=2, coderate=0.5):
     return 1 / (ebno * num_bits_per_symbol * coderate)
 
 
-def run_bler(snr_db_range, batch_size=32, num_batches=10, device="cpu", seed=1):
+def run_bler(snr_db_range, batch_size=32, num_batches=10, device="cpu", seed=1, num_layers=1):
     torch.manual_seed(seed)
-    transmitter, channel, receiver = build_link(device=device)
+    transmitter, channel, receiver = build_link(device=device, num_layers=num_layers)
 
     blers = []
     for snr_db in snr_db_range:

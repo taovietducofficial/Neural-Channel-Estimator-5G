@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 import torch
 import torch.nn as nn
-
 from sionna.phy.channel import OFDMChannel
 from sionna.phy.channel.tr38901 import CDL, AntennaArray
 from sionna.phy.nr import PUSCHConfig, PUSCHTransmitter
@@ -16,16 +15,24 @@ from src.models import CNNChannelEstimator, TransformerChannelEstimator
 MODELS = {"cnn": CNNChannelEstimator, "transformer": TransformerChannelEstimator}
 
 
-def build_training_link(device="cpu"):
+def build_training_link(device="cpu", num_layers=1):
     pusch_config = PUSCHConfig()
+    if num_layers > 1:
+        pusch_config.num_layers = num_layers
+        pusch_config.num_antenna_ports = num_layers
+        pusch_config.tpmi = 0
     transmitter = PUSCHTransmitter(pusch_config, device=device)
-    array_kwargs = dict(
-        num_rows=1, num_cols=1, polarization="single", polarization_type="V",
+    ut_kwargs = dict(
+        num_rows=1, num_cols=num_layers, polarization="single", polarization_type="V",
+        antenna_pattern="omni", carrier_frequency=CARRIER_FREQUENCY, device=device,
+    )
+    bs_kwargs = dict(
+        num_rows=1, num_cols=num_layers, polarization="single", polarization_type="V",
         antenna_pattern="omni", carrier_frequency=CARRIER_FREQUENCY, device=device,
     )
     cdl = CDL(
         model="C", delay_spread=100e-9, carrier_frequency=CARRIER_FREQUENCY,
-        ut_array=AntennaArray(**array_kwargs), bs_array=AntennaArray(**array_kwargs),
+        ut_array=AntennaArray(**ut_kwargs), bs_array=AntennaArray(**bs_kwargs),
         direction="uplink", max_speed=3.0, device=device,
     )
     channel = OFDMChannel(
@@ -36,9 +43,9 @@ def build_training_link(device="cpu"):
 
 
 def train(model_name, steps=500, batch_size=32, snr_min=-4.0, snr_max=14.0,
-          lr=1e-3, device="cpu", seed=0):
+          lr=1e-3, device="cpu", seed=0, num_layers=1):
     torch.manual_seed(seed)
-    pusch_config, transmitter, channel = build_training_link(device=device)
+    pusch_config, transmitter, channel = build_training_link(device=device, num_layers=num_layers)
     model = MODELS[model_name](transmitter.resource_grid, pusch_config).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.MSELoss()
@@ -75,12 +82,14 @@ if __name__ == "__main__":
     parser.add_argument("--snr-max", type=float, default=14.0)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--num-layers", type=int, default=1)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
 
     trained, final_loss = train(
         args.model, steps=args.steps, batch_size=args.batch_size,
         snr_min=args.snr_min, snr_max=args.snr_max, lr=args.lr, seed=args.seed,
+        num_layers=args.num_layers,
     )
     out_path = args.out or f"checkpoints/{args.model}.pt"
     os.makedirs("checkpoints", exist_ok=True)
@@ -94,6 +103,7 @@ if __name__ == "__main__":
         "snr_max_db": args.snr_max,
         "lr": args.lr,
         "seed": args.seed,
+        "num_layers": args.num_layers,
         "final_loss": final_loss,
         "trained_at": datetime.now(timezone.utc).isoformat(),
     }

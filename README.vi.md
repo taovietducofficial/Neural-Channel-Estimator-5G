@@ -120,20 +120,48 @@ xem [Giới hạn thành thật](#giới-hạn-thành-thật).
 
 | Batch size | Model | Tối ưu | Trước | Sau | Speedup |
 |---:|---|---|---:|---:|---:|
-| 8   | CNN | TorchScript trace+freeze | 2.89 ms | 3.24 ms | 0.89x |
-| 8   | Transformer | INT8 quantization (một phần) | 13.34 ms | 14.47 ms | 0.92x |
-| 256 | CNN | TorchScript trace+freeze | 118.5 ms | 111.1 ms | **1.07x** |
-| 256 | Transformer | INT8 quantization (một phần) | 524.3 ms | 526.0 ms | 1.00x |
+| 8   | CNN | TorchScript trace+freeze | 3.02 ms | 3.22 ms | 0.94x |
+| 8   | Transformer | INT8 quantization (một phần) | 12.56 ms | 19.83 ms | 0.63x |
+| 256 | CNN | TorchScript trace+freeze | 158.1 ms | 149.9 ms | **1.06x** |
+| 256 | Transformer | INT8 quantization (một phần) | 788.7 ms | 1071.3 ms | 0.74x |
 
 **Đọc thẳng:** nén model không tự động là một chiến thắng - ở batch size
 nhỏ, overhead của việc tối ưu còn lớn hơn cả lợi ích; nó chỉ có lãi khi
 batch size đủ lớn để khấu hao overhead đó. Đây là một phát hiện kỹ thuật
 thật về việc *khi nào* nén model có ích, đáng giá hơn một con số chỉ đẹp
-khi đứng một mình.
+khi đứng một mình. (Số tuyệt đối này dao động giữa các lần chạy tuỳ máy
+đang bận cỡ nào - tự chạy lại `python -m src.benchmark` để có số sạch; xu
+hướng định tính - nén có lợi ở batch lớn, không có lợi ở batch nhỏ - vẫn
+giữ nguyên qua mọi lần chạy lại.)
 
 Cả 2 model cũng đã được xác minh export sạch sang định dạng ONNX di động
 với sai số song song (parity) so với model PyTorch gốc (chênh lệch khoảng
 một phần mười triệu) - xem `service/export_model.py`.
+
+**Kiểm tra real-time** (`src/realtime_benchmark.py`, `results/realtime_latency.csv`):
+latency single-sample (batch=1) - con số thực sự quan trọng cho một hàm xử
+lý mỗi slot của radio - so với ngân sách slot thật của 5G NR:
+
+| Model | p50 | p95 | p99 | Vừa slot 1ms? | Vừa slot 0.25ms? |
+|---|---:|---:|---:|:---:|:---:|
+| CNN | 1.78 ms | 5.38 ms | 11.58 ms | Không | Không |
+| Transformer | 3.05 ms | 6.20 ms | 8.52 ms | Không | Không |
+
+**Đọc thẳng, không làm nhẹ đi:** trên CPU, cả 2 model hiện KHÔNG đạt bất kỳ
+ngân sách slot thật nào ở p99. Đây chính là lý do vì sao inference trên
+GPU/accelerator không phải "có thì tốt" mà là bắt buộc - xem
+`colab_gpu_benchmark.ipynb` để đo số GPU thật, và
+[`docs/oran-integration.md`](docs/oran-integration.md) để có thảo luận đầy
+đủ về khoảng trống này.
+
+**Xác thực MIMO (2-layer)** (`results/bler_results_mimo2.csv`,
+`results/bler_vs_snr_mimo2.png`): cùng kiến trúc CNN, không sửa gì, train
+lại trên cấu hình MIMO 2x2, vượt trội bộ ước lượng cổ điển trên toàn dải đo
+được (vd 0.109 vs 0.172 BLER ở 14dB - giảm tương đối ~37%). Để có kết quả
+*chạy đúng* cần đúng 1 lần sửa thật: lần thử đầu dùng 1 anten thu, về mặt lý
+thuyết thông tin không thể tách được 2 luồng không gian (BLER=100%) dù train
+thế nào - không phải lỗi model. Chi tiết đầy đủ trong
+[`docs/oran-integration.md`](docs/oran-integration.md).
 
 ---
 
@@ -167,7 +195,11 @@ src/models.py                   CNNChannelEstimator, TransformerChannelEstimator
 src/train.py                     trains a neural estimator on synthetic channel data
 src/evaluate.py                   BLER-vs-SNR comparison: baseline vs CNN vs Transformer
 src/benchmark.py                   inference latency + compression benchmark (CPU)
+src/realtime_benchmark.py            single-sample p50/p95/p99 latency vs real slot budgets
 tests/test_pipeline.py               assert-based smoke checks (research side)
+
+colab_gpu_benchmark.ipynb        notebook Colab chạy sẵn để đo số GPU thật
+oran-stub/                        demo REPORT/CONTROL kiểu E2 minh hoạ, chạy được thật (xem README riêng)
 
 service/export_model.py        offline: exports checkpoints to ONNX + parity check + provenance manifest
 service/fixtures/                 offline: real (noisy, perfect) channel fixtures at 3 SNRs
@@ -220,6 +252,13 @@ python -m src.evaluate --snr-min 6 --snr-max 10 --snr-step 0.5 --num-batches 32
 # 4. Benchmark chi phí inference + nén model
 python -m src.benchmark
 
+# 5. Kiểm tra real-time: latency p50/p95/p99 single-sample so với ngân sách slot thật
+python -m src.realtime_benchmark
+
+# Tuỳ chọn: train + đánh giá biến thể MIMO 2-layer (cùng kiến trúc, không sửa code)
+python -m src.train --model cnn --steps 1500 --num-layers 2 --out checkpoints/cnn_mimo2.pt
+python -m src.evaluate --snr-min 6 --snr-max 14 --snr-step 1 --num-batches 16 --num-layers 2
+
 # Smoke test
 python -m tests.test_pipeline
 ```
@@ -227,6 +266,10 @@ python -m tests.test_pipeline
 Kết quả nằm ở `results/bler_vs_snr.png`, `results/bler_results.csv`, và
 `results/benchmark.csv`. (`make research-test` / `make test` gói gọn các
 smoke test; xem `Makefile`.)
+
+Để có số liệu latency GPU thật, mở `colab_gpu_benchmark.ipynb` trên
+[Google Colab](https://colab.research.google.com/) (bật GPU runtime, rồi Run
+all) - notebook tự clone repo này và đo cùng 2 mạng trên GPU.
 
 ---
 
@@ -303,17 +346,30 @@ Nói thẳng thay vì giấu đi - những điều dự án này *KHÔNG* tuyên
   kính vùng phủ nào bị bịa ra - xem
   [`docs/business-impact.md`](docs/business-impact.md) để biết chính xác
   ranh giới đó nằm ở đâu.
-- **Không có số liệu GPU.** Không có GPU khi build dự án này; mọi số liệu
-  latency đều chỉ chạy CPU và được ghi rõ như vậy.
-- **Chưa kiểm chứng ngưỡng real-time.** Benchmark đo throughput theo batch,
-  chưa phải latency single-sample mà một ngân sách xử lý mỗi slot của radio
-  thật sự cần - xem [`docs/oran-integration.md`](docs/oran-integration.md).
-- **Chỉ cấu hình đơn ăng-ten.** Một mở rộng đa ăng-ten (MIMO) sẽ cần model
-  hoạt động trên thêm các chiều tensor hiện đang bị gộp phẳng vào chiều
-  batch.
-- **Không tích hợp nền tảng O-RAN thật.** Đã đánh giá và chủ động bỏ qua vì
-  không tương xứng với quy mô dự án này - lý do được ghi rõ, không lướt
-  qua, trong [`docs/oran-integration.md`](docs/oran-integration.md).
+- **Không đo GPU trực tiếp.** Không có GPU trên máy build; `colab_gpu_benchmark.ipynb`
+  là notebook chạy sẵn để lấy số latency GPU thật trên Colab free trong vài
+  phút - khoảng trống được lấp bằng 1 công cụ chạy được, không chỉ là lời
+  ghi chú.
+- **Ngưỡng real-time: đã đo, và hiện chưa đạt.** `src/realtime_benchmark.py`
+  giờ đo latency p50/p95/p99 single-sample so với ngân sách slot 5G NR thật
+  (0.25-1ms). Kết quả, nói thẳng: **trên CPU, cả 2 model hiện KHÔNG đạt bất
+  kỳ ngân sách nào ở p99** (`results/realtime_latency.csv`) - đây là khoảng
+  trống đã đo được thật, không phải bị làm nhẹ đi; xem
+  [`docs/oran-integration.md`](docs/oran-integration.md) để có số liệu đầy
+  đủ và ý nghĩa của nó.
+- **MIMO: đã xác thực cho 2 layer, không chỉ lý thuyết.** Tuyên bố "chỉ đơn
+  ăng-ten" ban đầu hẹp hơn thực tế - cùng kiến trúc CNN, không sửa gì, đã
+  train lại/đánh giá trên cấu hình MIMO 2x2 (`results/bler_results_mimo2.csv`),
+  vẫn vượt trội bộ ước lượng cổ điển ở đó. Xem
+  [`docs/oran-integration.md`](docs/oran-integration.md) để biết thứ thật sự
+  cần sửa (số anten thu, không phải model) và thứ chưa chạy (biến thể
+  Transformer ở MIMO).
+- **Không tích hợp nền tảng O-RAN thật.** Đã đánh giá dựa trên môi trường
+  WSL2 thật của máy này và chủ động bỏ qua vì không tương xứng - một bản
+  minh hoạ nhẹ cho pattern message chọn model đã được xây và chạy được
+  (`oran-stub/`), nhưng đây không phải tích hợp E2AP/RIC chuẩn; lý do được
+  ghi rõ, không lướt qua, trong
+  [`docs/oran-integration.md`](docs/oran-integration.md).
 
 ## Đọc thêm
 

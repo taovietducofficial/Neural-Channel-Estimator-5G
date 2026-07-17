@@ -40,21 +40,40 @@ lighter option exists — OpenAirInterface's **FlexRIC** (a research-oriented
 Near-RT RIC + E2 agent in C) — but exposing channel-estimation-level data
 through it is still nontrivial glue, not a same-day task either.
 
-**Decision: skip both.** This repo ships a clean, honestly-labeled analogy
-instead. Wiring the refiner into FlexRIC's E2 Service Model, or building a
-toy Non-RT-RIC-style periodic model-selection loop around
-`src/evaluate.py`, are both reasonable next projects for someone who wants to
-go deeper — listed below as explicit future work, not implied to already
-exist.
+**Decision: skip real RIC infrastructure, but build the illustrative pattern.**
+A real OSC/FlexRIC install was assessed against this machine's actual WSL2
+Ubuntu environment and found technically feasible but disproportionate — a
+from-source FlexRIC build is realistically 30-60+ minutes of fragile
+dependency work (cmake, protobuf, SCTP, SWIG) for a result that would only
+prove connectivity, not improve the model. Instead, `oran-stub/` is a small,
+genuinely-running two-process demo (`ric_server.py` / `e2_node_client.py`,
+real TCP sockets, real measured BLER numbers from `results/bler_results.csv`)
+of exactly the pattern described above: periodic REPORT → policy decision →
+CONTROL. It uses a simplified JSON protocol, not real E2AP/ASN.1/SCTP — see
+`oran-stub/README.md` for the explicit boundary. Wiring this same policy
+logic into a real FlexRIC E2 Service Model remains a reasonable next project
+for someone who wants to go deeper.
 
-## The "real-time" gap, stated plainly
+## The "real-time" gap — now actually measured
 
 `src/benchmark.py`'s numbers are **batched CPU throughput** (milliseconds per
-batch of 8 or 256 samples), not the **single-slot p99 latency** a real inline
-PHY function would actually be judged on (a hard deadline of 0.25–1ms per
-slot, no averaging across a batch). This project does not claim to have met
-a real-time deadline — it demonstrates the model, the serving architecture,
-and honest instrumentation of where the numbers currently stand.
+batch of 8 or 256 samples) — not the single-slot latency a real inline PHY
+function would be judged on. `src/realtime_benchmark.py` closes that
+measurement gap directly: it times single-sample (batch=1) inference and
+reports p50/p95/p99 latency against the real per-slot budgets 5G NR actually
+uses (1 ms / 0.5 ms / 0.25 ms for 15/30/60 kHz subcarrier spacing).
+
+**Measured result (CPU, `results/realtime_latency.csv`):** both models miss
+every one of those budgets at p99 (CNN ~11.6 ms, Transformer ~8.5 ms, all
+roughly 10-50x over budget). Stated plainly rather than downplayed: **on
+CPU, neither model is currently real-time-capable for an inline per-slot
+PHY function.** This is the honest reason GPU or dedicated accelerator
+inference (see `colab_gpu_benchmark.ipynb`) isn't just a "nice to have" for
+this use case — it's the difference between a research artifact and a
+deployable one. It also reflects that this is a general-purpose Python
+process, not a hard real-time runtime; even with faster hardware, meeting
+these percentiles in production would need a real-time-scheduled inference
+path, not just a faster forward pass.
 
 ## Path to 6G: why this architecture doesn't need to be rebuilt
 
@@ -83,11 +102,34 @@ architecture doesn't couple itself to any specific generation's assumptions
 beyond the minimum needed, so whatever comes after 6G, the serving layer
 doesn't need a rewrite — only a new model artifact.
 
+## MIMO: validated, not just theoretically possible
+
+The single-antenna limitation noted elsewhere in this repo turned out to be
+narrower than first assumed. `_BaseNeuralEstimator`'s grid-flattening
+(`src/models.py`) already generalizes to extra tensor dimensions — a
+2-layer (2x2) MIMO PUSCH config runs through the exact same CNN/Transformer
+code with zero architecture changes. That was verified directly: a first
+attempt (UE with 2 TX antennas, gNB with only 1 RX antenna) ran without
+crashing but produced 100% BLER, because separating 2 spatial streams needs
+at least 2 receive antennas — a MIMO information-theory constraint, not a
+bug in the neural model. Fixing the receive-antenna count
+(`num_layers`-many `bs_array` antennas in `src/baseline.py`/`train.py`/
+`evaluate.py`) and retraining (`python -m src.train --model cnn --num-layers 2`)
+produced a real, working 2x2 result
+(`results/bler_results_mimo2.csv` / `results/bler_vs_snr_mimo2.png`): the
+CNN estimator beats the classical one across the whole measured range (e.g.
+0.109 vs 0.172 BLER at 14 dB — roughly a 37% relative reduction), using
+the identical architecture trained on the original single-antenna config
+elsewhere in this repo. The Transformer variant wasn't retrained for MIMO
+in this pass; extending the same `--num-layers` flag to it is a direct
+repeat of the same steps, not new engineering.
+
 ## Future extensions (not built, explicitly out of scope for this repo)
 
-- Real OSC Near-RT RIC or FlexRIC integration.
-- A periodic "model-selection rApp" simulation (re-evaluate BLER on a
-  schedule, toggle which model a cell uses via an A1-style policy).
-- Single-sample (batch=1) p99 latency measurement against an actual
-  slot-duration budget.
-- GPU benchmarking (no local GPU available; see main README).
+- Real OSC Near-RT RIC or FlexRIC integration (a lightweight illustrative
+  stand-in for the model-selection message pattern is built — see
+  `oran-stub/` — but it is not a real E2AP/SCTP/RIC-platform integration).
+- Transformer MIMO training/evaluation (same `--num-layers` mechanism as
+  CNN, just not run in this pass).
+- GPU benchmarking beyond what `colab_gpu_benchmark.ipynb` measures when
+  run (no local GPU available to run it here directly; see main README).
