@@ -1,0 +1,6 @@
+fastapi==0.139.2
+uvicorn==0.51.0
+onnxruntime==1.27.0
+numpy==2.4.6
+pydantic==2.13.4
+prometheus-client==0.25.0

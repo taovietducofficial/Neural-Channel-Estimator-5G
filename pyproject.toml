@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"service/export_model.py" = ["E402", "I001"]
+"service/fixtures/gen_fixtures.py" = ["E402", "I001"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped"]

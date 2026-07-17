@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>5G Neural Channel Estimator — Demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 1.3rem; }
+  button { margin: 6px 8px 6px 0; padding: 8px 16px; font-size: 1rem; cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  .best { font-weight: bold; color: #1a7f37; }
+  #meta { color: #555; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>5G NR Channel Estimator: classical LS vs neural (CNN / Transformer)</h1>
+<p>Chọn một mức SNR để chạy dữ liệu kênh thật (được sinh từ mô phỏng Sionna) qua 3 phương pháp ước lượng kênh, so sánh sai số (MSE) so với kênh hoàn hảo (genie-aided) và độ trễ inference đo thật.</p>
+<div>
+  <button onclick="run('low')">SNR thấp (-2 dB)</button>
+  <button onclick="run('mid')">SNR trung bình (8 dB)</button>
+  <button onclick="run('high')">SNR cao (14 dB)</button>
+</div>
+<div id="meta"></div>
+<table id="results" style="display:none">
+  <thead><tr><th>Phương pháp</th><th>MSE vs kênh hoàn hảo</th><th>Latency (ms)</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+async function run(bucket) {
+  document.getElementById('meta').textContent = 'Đang chạy...';
+  const res = await fetch(`/v1/demo/${bucket}`);
+  if (!res.ok) {
+    document.getElementById('meta').textContent = 'Lỗi: ' + res.status;
+    return;
+  }
+  const data = await res.json();
+  document.getElementById('meta').textContent = `Bucket: ${data.bucket} (SNR = ${data.snr_db} dB)`;
+
+  const rows = Object.entries(data.results);
+  const bestKey = rows.reduce((a, b) => a[1].mse_vs_perfect < b[1].mse_vs_perfect ? a : b)[0];
+
+  const tbody = document.querySelector('#results tbody');
+  tbody.innerHTML = '';
+  const labels = { raw_ls: 'Classical LS (raw)', cnn: 'Neural CNN', transformer: 'Neural Transformer' };
+  for (const [key, val] of rows) {
+    const tr = document.createElement('tr');
+    const cls = key === bestKey ? 'best' : '';
+    tr.innerHTML = `<td class="${cls}">${labels[key] || key}</td><td class="${cls}">${val.mse_vs_perfect.toExponential(3)}</td><td class="${cls}">${val.latency_ms.toFixed(3)}</td>`;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('results').style.display = 'table';
+}
+</script>
+</body>
+</html>

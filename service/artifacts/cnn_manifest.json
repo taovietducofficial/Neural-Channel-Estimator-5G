@@ -1,0 +1,20 @@
+{
+  "model": "cnn",
+  "export_format": "onnx",
+  "onnx_opset": 17,
+  "checkpoint_file": "cnn.pt",
+  "checkpoint_sha256": "0235f77989354d6384fa9c420ea7a96580a864a82e775ac0d18b9b8dc5fe4348",
+  "parity_max_diff": 3.5762786865234375e-07,
+  "exported_at": "2026-07-17T19:52:11.787484+00:00",
+  "training_run": {
+    "model": "cnn",
+    "steps": 1500,
+    "batch_size": 32,
+    "snr_min_db": -4.0,
+    "snr_max_db": 14.0,
+    "lr": 0.001,
+    "seed": 0,
+    "final_loss": 0.005103,
+    "trained_at": "2026-07-17T00:00:00+00:00"
+  }
+}

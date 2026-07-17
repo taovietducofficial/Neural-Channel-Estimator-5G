@@ -1,0 +1,20 @@
+{
+  "model": "transformer",
+  "export_format": "onnx",
+  "onnx_opset": 17,
+  "checkpoint_file": "transformer.pt",
+  "checkpoint_sha256": "243c99a991810f302bebf75f4125d3635db19d7cfc39e332d3ac96af0c48a83b",
+  "parity_max_diff": 5.960464477539062e-07,
+  "exported_at": "2026-07-17T19:52:18.825379+00:00",
+  "training_run": {
+    "model": "transformer",
+    "steps": 1500,
+    "batch_size": 32,
+    "snr_min_db": -4.0,
+    "snr_max_db": 14.0,
+    "lr": 0.001,
+    "seed": 0,
+    "final_loss": 0.017839,
+    "trained_at": "2026-07-17T00:00:00+00:00"
+  }
+}
