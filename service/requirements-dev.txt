@@ -1,4 +1,4 @@
 -r requirements.txt
 httpx==0.28.1
-ruff==0.15.22
+ruff==0.16.0
 mypy==2.3.0
