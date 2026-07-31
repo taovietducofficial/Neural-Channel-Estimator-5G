@@ -1,4 +1,4 @@
-fastapi==0.139.2
+fastapi==0.140.8
 uvicorn==0.51.0
 onnxruntime==1.27.0
 numpy==2.4.6
